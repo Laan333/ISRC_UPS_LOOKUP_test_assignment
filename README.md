@@ -44,7 +44,7 @@ curl "http://localhost:8000/lookup/isrc/USRC17607839"
 
 ### Domain, HTTP vs HTTPS, OpenAPI “Try it out”, and `.env`
 
-Create a `.env` next to `docker-compose.yml` (see `.env.example`). The **`api`** service loads that file as `env_file`, so provider toggles and secrets (e.g. **`PROVIDER_SPOTIFY_ENABLED`** / **`SPOTIFY_*`**) are visible inside the container; the explicit `environment:` block only overrides a few keys (logging, CORS, etc.). Match **`OPENAPI_SERVER_URL`** (and optional **`READY_CHECK_URL`**) to what users type in the browser: **`http://…`** for plain HTTP, **`https://…`** when TLS is terminated at nginx. If nginx listens on a **non-default host port** (e.g. `NGINX_HTTP_PORT=7000`), include that port in the URL: `http://YOUR_IP:7000` and `http://YOUR_IP:7000/health` for `READY_CHECK_URL`.
+Create a `.env` next to `docker-compose.yml` (see `.env.example`). The **`api`** service loads that file as `env_file`, so provider toggles and secrets (e.g. **`DISCOGS_CONSUMER_KEY`** / **`DISCOGS_CONSUMER_SECRET`** or **`DISCOGS_PERSONAL_ACCESS_TOKEN`**) are visible inside the container; the explicit `environment:` block only overrides a few keys (logging, CORS, etc.). Match **`OPENAPI_SERVER_URL`** (and optional **`READY_CHECK_URL`**) to what users type in the browser: **`http://…`** for plain HTTP, **`https://…`** when TLS is terminated at nginx. If nginx listens on a **non-default host port** (e.g. `NGINX_HTTP_PORT=7000`), include that port in the URL: `http://YOUR_IP:7000` and `http://YOUR_IP:7000/health` for `READY_CHECK_URL`.
 
 | Variable | Purpose |
 |----------|---------|
@@ -126,17 +126,14 @@ The easiest path is a `.env` file: copy `.env.example` to `.env` and adjust valu
 | `OUTBOUND_MAX_CONCURRENT` | Concurrent outbound GETs to providers (semaphore); `0` disables limiting. |
 | `MAX_RESPONSE_BODY_BYTES` | Upper bound on provider response body size while streaming (default `2000000`); oversize is treated like a transport failure for that provider. |
 | `API_RATE_LIMIT_PER_MINUTE` | Per-IP sliding window (60s) for the API, excluding `/health`, `/ready`, and OpenAPI static routes. `0` disables. |
-| `DISCOGS_PERSONAL_ACCESS_TOKEN` | Optional Discogs token for friendlier rate limits. |
+| `DISCOGS_CONSUMER_KEY` / `DISCOGS_LOGIN` | Discogs **Consumer Key** (в кабинете разработчика то же поле, что «логин потребителя»). Синонимы переменных — см. `.env.example`. |
+| `DISCOGS_CONSUMER_SECRET` / `DISCOGS_PASSWORD` | **Consumer Secret** («пароль потребителя»). Это **не** пароль от входа на discogs.com. Вместе с ключом отправляется заголовок `Authorization: Discogs key=…, secret=…` ([документация](https://www.discogs.com/developers/#page:authentication)). |
+| `DISCOGS_PERSONAL_ACCESS_TOKEN` | Опционально: личный токен; если задан — заголовок `Discogs token=…`, пара Consumer не используется. |
 | `PROVIDER_MUSICBRAINZ_ENABLED` | `true` / `false`; default `true`. |
 | `PROVIDER_DEEZER_ENABLED` | `true` / `false`; default `true`. |
 | `PROVIDER_DISCOGS_ENABLED` | `true` / `false`. |
 | `PROVIDER_WIKIDATA_ENABLED` | `true` / `false` (ISRC only). |
 | `PROVIDER_OPEN_LIBRARY_ENABLED` | `true` / `false` (UPC only). |
-| `PROVIDER_SPOTIFY_ENABLED` | `true` / `false`; default `false`. ISRC + UPC via Spotify Web API. |
-| `SPOTIFY_CLIENT_ID` | Required when Spotify is enabled: [Dashboard](https://developer.spotify.com/dashboard) app Client ID. |
-| `SPOTIFY_CLIENT_SECRET` | Same app Client Secret (keep on server only). |
-| `SPOTIFY_ACCOUNTS_URL` | Optional; default `https://accounts.spotify.com`. |
-| `SPOTIFY_API_BASE_URL` | Optional; default `https://api.spotify.com`. |
 | `LOOKUP_CACHE_ENABLED` | In-memory cache of full lookup responses; default `true`. |
 | `LOOKUP_CACHE_TTL_S` | Cache TTL in seconds (e.g. `300`). `0` disables cache creation. |
 | `LOOKUP_CACHE_MAX_ENTRIES` | Max number of cache entries; default `512`. |
@@ -201,13 +198,12 @@ Every response should include header **`X-Request-ID`** (from middleware).
 
 - **Stack:** Python 3.12, FastAPI, httpx (async), Pydantic v2. **Playwright** is not bundled in the image: current providers use HTTP/JSON or SPARQL. JS-heavy sites (e.g. IFPI) could be added later via an extra Docker build stage if needed.
 - **Providers**
-  - **musicbrainz** — recordings by ISRC, releases by barcode; ~1 request/s to MusicBrainz (async lock).
+  - **musicbrainz** — recordings by ISRC (then `GET /recording/{id}` with releases / release-groups / ISRC list, plus optional `GET /release/{id}?inc=labels` for a picked official release), releases by barcode (same label lookup on the first hit). Respects ~1 request/s to MusicBrainz (async lock), so a full ISRC path can take **~2–3 s** for this provider alone.
   - **deezer** — public Deezer search API; supports `isrc:"…"` and `upc:"…"` style queries without an API key (catalog coverage varies).
-  - **discogs** — release search by barcode; ISRC path is heuristic and may miss.
+  - **discogs** — **UPC/EAN:** `GET /database/search?barcode=…`; if no hits, fallback `q=<code>&type=release`; then `GET /releases/{id}` to fill **label**, year, country, formats when the search hit includes a release id. **ISRC:** text search on `type=release` (heuristic). **Auth ([Discogs Auth](https://www.discogs.com/developers/#page:authentication)):** `Authorization: Discogs key=<Consumer Key>, secret=<Consumer Secret>` (в UI Discogs это же «логин/пароль потребителя» приложения) или `Discogs token=<personal token>`. OAuth с `oauth/request_token` нужен для действий **от имени пользователя**, не для этих публичных чтений каталога.
   - **wikidata** — SPARQL on P1243 (ISRC); not used for UPC in this build.
   - **open_library** — Open Library `search.json?q=…`; often books/ISBN; weak for music UPC but adds an independent signal.
-  - **spotify** (optional) — [Spotify Web API](https://developer.spotify.com/documentation/web-api) Client Credentials: search `isrc:…` (tracks) and `upc:…` (albums). Off by default; requires `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` on the server. Follow [Spotify Developer Policy](https://developer.spotify.com/policy).
-- **Public APIs and policies:** integrations rely on documented HTTP APIs / SPARQL. Respect each provider’s rate limits and terms — [MusicBrainz API](https://musicbrainz.org/doc/MusicBrainz_API), [Discogs API](https://www.discogs.com/developers/), [Wikidata Query Service](https://wikidata.org/wiki/Wikidata:Data_access) / [Terms of Use](https://foundation.wikimedia.org/wiki/Policy:Terms_of_Use), [Open Library API](https://openlibrary.org/developers/api), [Deezer API for developers](https://developers.deezer.com/), and Spotify links above. This project is not an official client of those organizations.
+- **Public APIs and policies:** integrations rely on documented HTTP APIs / SPARQL. Respect each provider’s rate limits and terms — [MusicBrainz API](https://musicbrainz.org/doc/MusicBrainz_API), [Discogs API](https://www.discogs.com/developers/), [Wikidata Query Service](https://wikidata.org/wiki/Wikidata:Data_access) / [Terms of Use](https://foundation.wikimedia.org/wiki/Policy:Terms_of_Use), [Open Library API](https://openlibrary.org/developers/api), [Deezer API for developers](https://developers.deezer.com/). This project is not an official client of those organizations.
 - **Cache:** process-local TTL keyed by `isrc:{code}` / `upc:{code}`; not shared across replicas — for production multi-instance setups consider Redis (see `CHECKLIST.md`).
 - **Orchestration:** `asyncio.gather` across providers; failures surface in `providers[].error` while the overall response stays **200** when the HTTP handler succeeds.
 - **Outbound HTTP:** shared `resilient_get` — outbound concurrency cap (`OUTBOUND_MAX_CONCURRENT`), response body cap (`MAX_RESPONSE_BODY_BYTES`), and limited retries for idempotent GETs on transport errors and `502`/`503`/`504` (no retries on `4xx`).

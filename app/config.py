@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -9,6 +9,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        populate_by_name=True,
     )
 
     app_name: str = "ISRC/UPC Lookup"
@@ -41,18 +42,36 @@ class Settings(BaseSettings):
     open_library_search_url: str = "https://openlibrary.org/search.json"
 
     discogs_personal_access_token: str | None = None
-
-    spotify_accounts_url: str = "https://accounts.spotify.com"
-    spotify_api_base_url: str = "https://api.spotify.com"
-    spotify_client_id: str | None = None
-    spotify_client_secret: str | None = None
+    discogs_consumer_key: str | None = Field(
+        default=None,
+        description=(
+            "Discogs Developer «Consumer Key» / UI «логин потребителя» "
+            "(env: DISCOGS_CONSUMER_KEY or DISCOGS_LOGIN)."
+        ),
+        validation_alias=AliasChoices(
+            "DISCOGS_CONSUMER_KEY",
+            "DISCOGS_CONSUMER_LOGIN",
+            "DISCOGS_LOGIN",
+        ),
+    )
+    discogs_consumer_secret: str | None = Field(
+        default=None,
+        description=(
+            "Discogs Developer «Consumer Secret» / UI «пароль потребителя» "
+            "(env: DISCOGS_CONSUMER_SECRET or DISCOGS_PASSWORD)."
+        ),
+        validation_alias=AliasChoices(
+            "DISCOGS_CONSUMER_SECRET",
+            "DISCOGS_CONSUMER_PASSWORD",
+            "DISCOGS_PASSWORD",
+        ),
+    )
 
     provider_musicbrainz_enabled: bool = True
     provider_deezer_enabled: bool = True
     provider_discogs_enabled: bool = True
     provider_wikidata_enabled: bool = True
     provider_open_library_enabled: bool = True
-    provider_spotify_enabled: bool = False
 
     lookup_cache_enabled: bool = True
     lookup_cache_ttl_s: float = 300.0

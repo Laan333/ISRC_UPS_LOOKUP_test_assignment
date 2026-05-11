@@ -20,7 +20,6 @@ from app.providers.deezer import DeezerProvider
 from app.providers.discogs import DiscogsProvider
 from app.providers.musicbrainz import MusicBrainzProvider
 from app.providers.open_library import OpenLibraryProvider
-from app.providers.spotify import SpotifyProvider
 from app.providers.wikidata import WikidataIsrcProvider
 from app.schemas.lookup import LookupResponse
 from app.services.lookup_service import LookupService
@@ -54,8 +53,6 @@ def make_lifespan(http_client: httpx.AsyncClient | None = None):
                 WikidataIsrcProvider(settings, client),
                 OpenLibraryProvider(settings, client),
             ]
-            if settings.provider_spotify_enabled:
-                providers.append(SpotifyProvider(settings, client))
             app.state.lookup_service = LookupService(settings, client, providers=providers, cache=cache)
             yield
         finally:

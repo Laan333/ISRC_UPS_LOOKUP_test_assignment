@@ -62,12 +62,6 @@ class LookupService:
                     self._safe_call("wikidata", self._providers["wikidata"].lookup_isrc(code))
                 )
             )
-        if self._settings.provider_spotify_enabled and "spotify" in self._providers:
-            tasks.append(
-                asyncio.create_task(
-                    self._safe_call("spotify", self._providers["spotify"].lookup_isrc(code))
-                )
-            )
 
         providers = await self._gather(tasks, request_id, code)
         summary = build_summary(providers)
@@ -109,12 +103,6 @@ class LookupService:
                     self._safe_call(
                         "open_library", self._providers["open_library"].lookup_upc(code)
                     )
-                )
-            )
-        if self._settings.provider_spotify_enabled and "spotify" in self._providers:
-            tasks.append(
-                asyncio.create_task(
-                    self._safe_call("spotify", self._providers["spotify"].lookup_upc(code))
                 )
             )
 
