@@ -52,6 +52,15 @@ class DiscogsProvider:
         params = {"q": code, "type": "release", "per_page": 5}
         return await self._search(url, params, is_barcode_query=False)
 
+    async def lookup_release_free_text(self, query: str) -> ProviderEntry:
+        """``database/search`` by free-text ``q`` (releases), when barcode/ISRC paths miss."""
+        q = collapse_ws(query) or ""
+        if not q:
+            return ProviderEntry(provider=self.id, found=False, raw=None)
+        url = f"{self._settings.discogs_api_base_url}/database/search"
+        params = {"q": q, "type": "release", "per_page": 10}
+        return await self._search(url, params, is_barcode_query=False)
+
     async def lookup_upc(self, code: str) -> ProviderEntry:
         url = f"{self._settings.discogs_api_base_url}/database/search"
         entry = await self._search(

@@ -31,8 +31,15 @@ def _ean13_check_digit(first_12: str) -> int:
 
 def validate_upc(code: str) -> str:
     digits = normalize_upc(code)
+    # GTIN-14 (e.g. from Spotify / Groover): leading packaging indicator + EAN-13.
+    if len(digits) == 14:
+        tail = digits[1:]
+        if int(tail[12]) == _ean13_check_digit(tail[:12]):
+            digits = tail
     if len(digits) not in (8, 12, 13):
-        raise ValueError("UPC/EAN must be 8, 12, or 13 digits.")
+        raise ValueError(
+            "UPC/EAN must be 8, 12, or 13 digits (or 14 digits that yield a valid EAN-13 after the first digit)."
+        )
     if len(digits) == 13:
         expected = _ean13_check_digit(digits[:12])
         if int(digits[12]) != expected:

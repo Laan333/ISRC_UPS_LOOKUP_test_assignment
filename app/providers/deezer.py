@@ -35,6 +35,13 @@ class DeezerProvider:
     async def lookup_upc(self, code: str) -> ProviderEntry:
         return await self._search(f'upc:"{code}"')
 
+    async def lookup_free_text(self, query: str) -> ProviderEntry:
+        """Plain Deezer search ``q=…`` (track-oriented results; used as a fallback when ISRC/UPC miss)."""
+        q = collapse_ws(query) or ""
+        if not q:
+            return ProviderEntry(provider=self.id, found=False, raw=None)
+        return await self._search(q)
+
     async def _search(self, query: str) -> ProviderEntry:
         url = f"{self._settings.deezer_api_base_url}/search"
         params = {"q": query, "limit": 5}

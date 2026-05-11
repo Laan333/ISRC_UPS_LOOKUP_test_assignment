@@ -31,5 +31,15 @@ def test_upc_invalid_check() -> None:
         validate_upc("5901234123450")
 
 
+def test_upc_gtin14_to_ean13_imagine_dragons_evolve() -> None:
+    """Groover / Spotify-style 14-digit GTIN with valid EAN-13 tail."""
+    assert validate_upc("00602567491248") == "0602567491248"
+
+
+def test_upc_14_invalid_tail_rejected() -> None:
+    with pytest.raises(ValueError):
+        validate_upc("00602567491240")
+
+
 def test_normalize_isrc() -> None:
     assert normalize_isrc(" gb-xyz-12-34567 ") == "GBXYZ1234567"
