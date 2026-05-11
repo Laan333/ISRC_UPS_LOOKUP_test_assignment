@@ -1,0 +1,19 @@
+{
+  "release-count": 1,
+  "releases": [
+    {
+      "id": "test-rel-id",
+      "title": "Example Album",
+      "date": "2020-05-01",
+      "barcode": "5901234123457",
+      "status": "Official",
+      "artist-credit": [
+        {
+          "artist": {
+            "name": "Band Name"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "recording-count": 1,
+  "recordings": [
+    {
+      "id": "test-rec-id",
+      "title": "Example Track",
+      "length": 205000,
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "test-artist",
+            "name": "Example Artist"
+          }
+        }
+      ]
+    }
+  ]
+}

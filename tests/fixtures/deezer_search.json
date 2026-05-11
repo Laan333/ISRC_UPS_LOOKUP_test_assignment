@@ -1,0 +1,15 @@
+{
+  "data": [
+    {
+      "id": 123,
+      "title": "Deezer Track",
+      "duration": 200,
+      "rank": 999,
+      "explicit_lyrics": false,
+      "link": "https://www.deezer.com/track/123",
+      "artist": { "id": 10, "name": "Deezer Artist" },
+      "album": { "id": 20, "title": "Deezer Album" }
+    }
+  ],
+  "total": 1
+}

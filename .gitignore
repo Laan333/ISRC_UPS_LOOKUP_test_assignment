@@ -1,0 +1,54 @@
+# Byte-compiled / optimized
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Environment & secrets (keep .env.example in repo)
+.env
+.env.local
+.env.*.local
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# Type checkers / linters (if added later)
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+dmypy.json
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+pip-wheel-metadata/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# JetBrains
+.idea/
+
+# VS Code (uncomment if you do not commit workspace settings)
+# .vscode/
