@@ -42,6 +42,13 @@ pip-wheel-metadata/
 # Logs
 *.log
 
+# TLS material (never commit real keys)
+certs/*.pem
+certs/*.key
+certs/*.crt
+!certs/README.md
+!certs/.gitkeep
+
 # OS
 .DS_Store
 Thumbs.db

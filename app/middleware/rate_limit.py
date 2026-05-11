@@ -48,5 +48,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         client = request.client
         key = client.host if client else "unknown"
         if not await self._limiter.allow(key):
-            return JSONResponse({"detail": "Too many requests"}, status_code=429)
+            rid = getattr(request.state, "request_id", None)
+            return JSONResponse(
+                {
+                    "detail": "Too many requests",
+                    "type": "rate_limited",
+                    "request_id": rid,
+                },
+                status_code=429,
+            )
         return await call_next(request)

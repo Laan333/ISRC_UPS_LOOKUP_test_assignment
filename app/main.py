@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from contextlib import asynccontextmanager
 
 import httpx
@@ -10,6 +9,8 @@ from scalar_fastapi import AgentScalarConfig, get_scalar_api_reference
 from app.api.routes import health, lookup
 from app.cache import TtlCache
 from app.config import get_settings
+from app.exception_handlers import register_exception_handlers
+from app.logging_setup import configure_logging
 from app.middleware.rate_limit import RateLimitMiddleware, SlidingWindowLimiter
 from app.middleware.request_id import RequestIdMiddleware
 from app.openapi_meta import APP_OPENAPI_DESCRIPTION, OPENAPI_TAGS_METADATA
@@ -21,11 +22,6 @@ from app.providers.open_library import OpenLibraryProvider
 from app.providers.wikidata import WikidataIsrcProvider
 from app.schemas.lookup import LookupResponse
 from app.services.lookup_service import LookupService
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s %(message)s",
-)
 
 
 def make_lifespan(http_client: httpx.AsyncClient | None = None):
@@ -68,6 +64,7 @@ def make_lifespan(http_client: httpx.AsyncClient | None = None):
 
 def create_app(*, http_client: httpx.AsyncClient | None = None) -> FastAPI:
     settings = get_settings()
+    configure_logging(settings)
     server_url = (settings.openapi_server_url or "").strip()
     servers = (
         [{"url": server_url.rstrip("/"), "description": "Configured host (e.g. docker compose)"}]
@@ -107,6 +104,7 @@ def create_app(*, http_client: httpx.AsyncClient | None = None) -> FastAPI:
         )
     app.include_router(health.router)
     app.include_router(lookup.router)
+    register_exception_handlers(app)
     return app
 
 

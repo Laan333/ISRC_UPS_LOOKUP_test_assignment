@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -53,6 +53,38 @@ class Settings(BaseSettings):
     lookup_cache_max_entries: int = 512
 
     api_rate_limit_per_minute: int = 120
+
+    log_level: str = Field(
+        default="INFO",
+        description="Root log level (env: LOG_LEVEL), e.g. DEBUG, INFO, WARNING.",
+    )
+    log_file_path: str | None = Field(
+        default="logs/app.log",
+        description=(
+            "Rotating application log file (env: LOG_FILE_PATH). "
+            "Empty string disables file logging (stdout only)."
+        ),
+    )
+    log_max_bytes: int = Field(
+        default=5_000_000,
+        ge=10_000,
+        description="Max size of one log file before rotation (env: LOG_MAX_BYTES).",
+    )
+    log_backup_count: int = Field(
+        default=5,
+        ge=1,
+        le=100,
+        description="Number of rotated log files to keep (env: LOG_BACKUP_COUNT).",
+    )
+
+    @field_validator("log_file_path", mode="before")
+    @classmethod
+    def empty_log_path_means_none(cls, v: object) -> object:
+        if v is None:
+            return None
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
 
 
 @lru_cache
