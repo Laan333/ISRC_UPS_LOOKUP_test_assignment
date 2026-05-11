@@ -10,7 +10,7 @@ docker compose up --build
 
 Compose starts:
 
-- **`nginx`** — custom image (`./nginx/Dockerfile`) that reverse-proxies to `api`. Listens on host **`NGINX_HTTP_PORT` → 80** (default **80**). When **HTTPS** is enabled, also **`NGINX_HTTPS_PORT` → 443** and **HTTP redirects to HTTPS** (301).
+- **`nginx`** — custom image (`./nginx/Dockerfile`) that reverse-proxies to `api`. By default only host **`NGINX_HTTP_PORT` → 80** is published (default **80**). When **`NGINX_SSL_ENABLED=true`**, merge **`docker-compose.https.yml`** so host **`NGINX_HTTPS_PORT` → 443** is published; nginx then redirects HTTP→HTTPS (301).
 - **`api`** — FastAPI / uvicorn on **`8000`** (still published for direct access and debugging).
 
 **Through nginx (HTTP):**  
@@ -21,7 +21,13 @@ curl "http://localhost/health"
 curl "http://localhost/lookup/isrc/USRC17607839"
 ```
 
-**Through nginx (HTTPS):** set `NGINX_SSL_ENABLED=true` in `.env`, place PEM files under `./certs/` (see `certs/README.md`), set `OPENAPI_SERVER_URL` and `READY_CHECK_URL` to **`https://…`** (same host/port as in the browser). Rebuild: `docker compose up --build`. Then:
+**Through nginx (HTTPS):** set `NGINX_SSL_ENABLED=true` in `.env`, add PEM files under `./certs/` (see `certs/README.md`), set `OPENAPI_SERVER_URL` / `READY_CHECK_URL` to **`https://…`** (same host/port as in the browser). Start with **both** compose files so port **443** is published (otherwise Docker never binds 443, even if SSL is on inside the image):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.https.yml up --build -d
+```
+
+Then:
 
 ```bash
 curl "https://localhost/health" -k   # -k only for self-signed local certs
@@ -38,14 +44,14 @@ curl "http://localhost:8000/lookup/isrc/USRC17607839"
 
 ### Domain, HTTP vs HTTPS, OpenAPI “Try it out”, and `.env`
 
-Create a `.env` next to `docker-compose.yml` (see `.env.example`). Match **`OPENAPI_SERVER_URL`** (and optional **`READY_CHECK_URL`**) to what users type in the browser: **`http://…`** for plain HTTP, **`https://…`** when TLS is terminated at nginx.
+Create a `.env` next to `docker-compose.yml` (see `.env.example`). Match **`OPENAPI_SERVER_URL`** (and optional **`READY_CHECK_URL`**) to what users type in the browser: **`http://…`** for plain HTTP, **`https://…`** when TLS is terminated at nginx. If nginx listens on a **non-default host port** (e.g. `NGINX_HTTP_PORT=7000`), include that port in the URL: `http://YOUR_IP:7000` and `http://YOUR_IP:7000/health` for `READY_CHECK_URL`.
 
 | Variable | Purpose |
 |----------|---------|
 | `OPENAPI_SERVER_URL` | Public base URL for Swagger / Scalar **Try it out** (scheme + host + port). Examples: `http://localhost`, `https://api.example.com`. |
 | `READY_CHECK_URL` | Optional URL probed by `GET /ready`; use the **same scheme and host** as the public edge (e.g. `https://api.example.com/health`). |
 | `NGINX_HTTP_PORT` | Host → container `80` (default `80`). Use `8080` if port 80 is busy. |
-| `NGINX_HTTPS_PORT` | Host → container `443` when SSL is enabled (default `443`). |
+| `NGINX_HTTPS_PORT` | Host port mapped to nginx `443` **only when** you use `docker-compose.https.yml` (default `443`). |
 | `NGINX_SSL_ENABLED` | `true` / `false` (default `false`). When `true`, nginx loads TLS PEMs and redirects port **80** → **HTTPS**. |
 | `NGINX_SSL_CERT_DIR` | Host directory mounted as `/etc/nginx/ssl` (default `./certs`). |
 | `NGINX_SSL_CERT` | Path **inside the container** to the certificate chain (default `/etc/nginx/ssl/fullchain.pem`). |
@@ -108,7 +114,7 @@ The easiest path is a `.env` file: copy `.env.example` to `.env` and adjust valu
 | `OPENAPI_SERVER_URL` | Base URL listed under OpenAPI **`servers`** for Swagger/Scalar **Try it out**. Use **`http://…`** or **`https://…`** to match how clients reach nginx (e.g. `http://localhost`, `https://api.example.com`). Empty string omits `servers` from the schema. |
 | `READY_CHECK_URL` | Optional: URL probed by `GET /ready`. If unreachable or returns `5xx`, `/ready` responds with **503**. Use the same scheme as the public URL (`http` vs `https`). |
 | `NGINX_HTTP_PORT` | Host port mapped to nginx HTTP `80` (default `80`). |
-| `NGINX_HTTPS_PORT` | Host port mapped to nginx HTTPS `443` (default `443`). |
+| `NGINX_HTTPS_PORT` | Host port mapped to nginx `443` **only when** you use `docker-compose.https.yml` (default `443`). |
 | `NGINX_SSL_ENABLED` | `true` / `false` — terminate TLS in nginx and redirect HTTP→HTTPS (default `false`). |
 | `NGINX_SSL_CERT_DIR` | Host directory mounted at `/etc/nginx/ssl` (default `./certs`). |
 | `NGINX_SSL_CERT` | PEM chain path **inside the container** (default `/etc/nginx/ssl/fullchain.pem`). |

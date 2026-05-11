@@ -1,0 +1,7 @@
+# Optional: publish HTTPS (container :443) to the host when using NGINX_SSL_ENABLED=true.
+# Merge when starting the stack, e.g.:
+#   docker compose -f docker-compose.yml -f docker-compose.https.yml up --build -d
+services:
+  nginx:
+    ports:
+      - "${NGINX_HTTPS_PORT:-443}:443"
