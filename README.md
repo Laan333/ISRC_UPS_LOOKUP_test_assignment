@@ -132,6 +132,11 @@ The easiest path is a `.env` file: copy `.env.example` to `.env` and adjust valu
 | `PROVIDER_DISCOGS_ENABLED` | `true` / `false`. |
 | `PROVIDER_WIKIDATA_ENABLED` | `true` / `false` (ISRC only). |
 | `PROVIDER_OPEN_LIBRARY_ENABLED` | `true` / `false` (UPC only). |
+| `PROVIDER_SPOTIFY_ENABLED` | `true` / `false`; default `false`. ISRC + UPC via Spotify Web API. |
+| `SPOTIFY_CLIENT_ID` | Required when Spotify is enabled: [Dashboard](https://developer.spotify.com/dashboard) app Client ID. |
+| `SPOTIFY_CLIENT_SECRET` | Same app Client Secret (keep on server only). |
+| `SPOTIFY_ACCOUNTS_URL` | Optional; default `https://accounts.spotify.com`. |
+| `SPOTIFY_API_BASE_URL` | Optional; default `https://api.spotify.com`. |
 | `LOOKUP_CACHE_ENABLED` | In-memory cache of full lookup responses; default `true`. |
 | `LOOKUP_CACHE_TTL_S` | Cache TTL in seconds (e.g. `300`). `0` disables cache creation. |
 | `LOOKUP_CACHE_MAX_ENTRIES` | Max number of cache entries; default `512`. |
@@ -201,7 +206,8 @@ Every response should include header **`X-Request-ID`** (from middleware).
   - **discogs** — release search by barcode; ISRC path is heuristic and may miss.
   - **wikidata** — SPARQL on P1243 (ISRC); not used for UPC in this build.
   - **open_library** — Open Library `search.json?q=…`; often books/ISBN; weak for music UPC but adds an independent signal.
-- **Public APIs and policies:** integrations rely on documented HTTP APIs / SPARQL. Respect each provider’s rate limits and terms — [MusicBrainz API](https://musicbrainz.org/doc/MusicBrainz_API), [Discogs API](https://www.discogs.com/developers/), [Wikidata Query Service](https://wikidata.org/wiki/Wikidata:Data_access) / [Terms of Use](https://foundation.wikimedia.org/wiki/Policy:Terms_of_Use), [Open Library API](https://openlibrary.org/developers/api), [Deezer API for developers](https://developers.deezer.com/). This project is not an official client of those organizations.
+  - **spotify** (optional) — [Spotify Web API](https://developer.spotify.com/documentation/web-api) Client Credentials: search `isrc:…` (tracks) and `upc:…` (albums). Off by default; requires `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` on the server. Follow [Spotify Developer Policy](https://developer.spotify.com/policy).
+- **Public APIs and policies:** integrations rely on documented HTTP APIs / SPARQL. Respect each provider’s rate limits and terms — [MusicBrainz API](https://musicbrainz.org/doc/MusicBrainz_API), [Discogs API](https://www.discogs.com/developers/), [Wikidata Query Service](https://wikidata.org/wiki/Wikidata:Data_access) / [Terms of Use](https://foundation.wikimedia.org/wiki/Policy:Terms_of_Use), [Open Library API](https://openlibrary.org/developers/api), [Deezer API for developers](https://developers.deezer.com/), and Spotify links above. This project is not an official client of those organizations.
 - **Cache:** process-local TTL keyed by `isrc:{code}` / `upc:{code}`; not shared across replicas — for production multi-instance setups consider Redis (see `CHECKLIST.md`).
 - **Orchestration:** `asyncio.gather` across providers; failures surface in `providers[].error` while the overall response stays **200** when the HTTP handler succeeds.
 - **Outbound HTTP:** shared `resilient_get` — outbound concurrency cap (`OUTBOUND_MAX_CONCURRENT`), response body cap (`MAX_RESPONSE_BODY_BYTES`), and limited retries for idempotent GETs on transport errors and `502`/`503`/`504` (no retries on `4xx`).

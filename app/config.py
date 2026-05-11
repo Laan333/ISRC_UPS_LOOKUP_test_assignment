@@ -42,11 +42,17 @@ class Settings(BaseSettings):
 
     discogs_personal_access_token: str | None = None
 
+    spotify_accounts_url: str = "https://accounts.spotify.com"
+    spotify_api_base_url: str = "https://api.spotify.com"
+    spotify_client_id: str | None = None
+    spotify_client_secret: str | None = None
+
     provider_musicbrainz_enabled: bool = True
     provider_deezer_enabled: bool = True
     provider_discogs_enabled: bool = True
     provider_wikidata_enabled: bool = True
     provider_open_library_enabled: bool = True
+    provider_spotify_enabled: bool = False
 
     lookup_cache_enabled: bool = True
     lookup_cache_ttl_s: float = 300.0
