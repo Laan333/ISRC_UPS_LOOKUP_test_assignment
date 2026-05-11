@@ -57,7 +57,7 @@ Create a `.env` next to `docker-compose.yml` (see `.env.example`). Match **`OPEN
 | `NGINX_SSL_CERT` | Path **inside the container** to the certificate chain (default `/etc/nginx/ssl/fullchain.pem`). |
 | `NGINX_SSL_KEY` | Path **inside the container** to the private key (default `/etc/nginx/ssl/privkey.pem`). |
 
-Nginx behaviour is generated at container start from `nginx/http-only.conf` or `nginx/https.conf.envsubst` (see `nginx/docker-entrypoint.d/99-gen-nginx-conf.sh`). To pin a hostname, edit `server_name _;` in those files to e.g. `server_name api.example.com;` and rebuild the nginx image.
+Nginx behaviour is generated at container start from `nginx/http-only.conf` or `nginx/https.conf.envsubst` (see `nginx/docker-entrypoint.d/09-gen-nginx-conf.sh`). To pin a hostname, edit `server_name _;` in those files to e.g. `server_name api.example.com;` and rebuild the nginx image.
 
 **Interactive docs (after startup):**  
 Use the same scheme/host/port as in `OPENAPI_SERVER_URL` (e.g. `https://localhost/docs` when HTTPS is enabled, or `http://localhost/docs` on HTTP only). Direct uvicorn: [Swagger UI](http://localhost:8000/docs), etc.

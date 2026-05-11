@@ -1,6 +1,7 @@
 #!/bin/sh
 set -e
-# Runs before nginx starts (official image runs /docker-entrypoint.d/*.sh in order).
+# Runs before 10-listen-on-ipv6-by-default.sh so the stock default.conf is replaced first,
+# then the IPv6 helper adjusts our generated file.
 
 enabled="${NGINX_SSL_ENABLED:-false}"
 case "$enabled" in
