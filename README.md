@@ -144,7 +144,7 @@ Copy `.env.example` to `.env` and adjust. Below are the main **application** set
 | `APP_VERSION` | OpenAPI `info.version` string; default `0.1.0`. |
 | `OPENAPI_SERVER_URL` | Base URL under OpenAPI **`servers`** for Swagger/Scalar **Try it out**. Empty string omits `servers` from the schema. |
 | `READY_CHECK_URL` | Optional: URL probed by `GET /ready`. If unreachable or returns `5xx`, `/ready` responds with **503**. |
-| `USER_AGENT` | Outgoing `User-Agent` for provider HTTP calls. |
+| `USER_AGENT` | Outgoing `User-Agent` for provider HTTP calls. **Docker:** `docker-compose.yml` sets this in the `api` service `environment:` block, so it **overrides** the same key from `.env` for containers—edit the compose file to change UA under Compose. |
 | `HTTP_TIMEOUT_S` | httpx timeout in seconds; default `15`. |
 | `HTTP_GET_MAX_RETRIES` | Extra GET attempts on timeout/connection issues or `502`/`503`/`504`; default `2`. |
 | `HTTP_GET_RETRY_BACKOFF_S` | Base delay (seconds) for exponential backoff between retries. |
@@ -430,7 +430,7 @@ python client.py --interactive --pretty
 | `APP_VERSION` | Строка версии в OpenAPI `info.version`; по умолчанию `0.1.0`. |
 | `OPENAPI_SERVER_URL` | Базовый URL в OpenAPI **`servers`** для **Try it out**. Пустая строка убирает `servers` из схемы. |
 | `READY_CHECK_URL` | Опционально: URL для проверки в `GET /ready`; при недоступности или `5xx` — ответ **503**. |
-| `USER_AGENT` | Исходящий `User-Agent` для запросов к провайдерам. |
+| `USER_AGENT` | Исходящий `User-Agent` для запросов к провайдерам. **Docker:** в `docker-compose.yml` для сервиса `api` значение задано в `environment:` и **перекрывает** одноимённый ключ из `.env` — меняйте compose, если нужен другой UA в контейнере. |
 | `HTTP_TIMEOUT_S` | Таймаут httpx в секундах; по умолчанию `15`. |
 | `HTTP_GET_MAX_RETRIES` | Дополнительные попытки GET при таймаутах/обрыве или `502`/`503`/`504`; по умолчанию `2`. |
 | `HTTP_GET_RETRY_BACKOFF_S` | Базовая задержка (сек) для экспоненциального backoff между повторами. |
