@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 import httpx
 from fastapi import FastAPI
 from scalar_fastapi import AgentScalarConfig, get_scalar_api_reference
+from starlette.middleware.cors import CORSMiddleware
 
 from app.api.routes import health, lookup
 from app.cache import TtlCache
@@ -101,6 +102,15 @@ def create_app(*, http_client: httpx.AsyncClient | None = None) -> FastAPI:
                 max_requests=settings.api_rate_limit_per_minute,
                 window_s=60.0,
             ),
+        )
+    cors_origins = settings.cors_origins_for_middleware()
+    if cors_origins is not None:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=cors_origins,
+            allow_credentials=False,
+            allow_methods=["*"],
+            allow_headers=["*"],
         )
     app.include_router(health.router)
     app.include_router(lookup.router)

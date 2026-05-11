@@ -140,6 +140,7 @@ The easiest path is a `.env` file: copy `.env.example` to `.env` and adjust valu
 | `LOG_FILE_PATH` | Rotating app log file, relative to the process working directory (default `logs/app.log`). Set to empty to disable file logging (stdout only). |
 | `LOG_MAX_BYTES` | Max size of one log file before rotation (default `5000000`). |
 | `LOG_BACKUP_COUNT` | Number of old log files to retain (default `5`). |
+| `CORS_ALLOW_ORIGINS` | Browser CORS: `*` (default), comma-separated origins, or empty to disable CORS middleware. |
 
 ## Endpoints
 
@@ -147,6 +148,12 @@ The easiest path is a `.env` file: copy `.env.example` to `.env` and adjust valu
 - `GET /ready` — readiness. If `READY_CHECK_URL` is set, performs an extra HTTP GET to that URL.
 - `GET /lookup/isrc/{code}` — ISRC normalization (case and hyphens ignored); **422** on invalid format.
 - `GET /lookup/upc/{code}` — digits of length 8 / 12 / 13; for 12 and 13, **EAN-13 / UPC-A check digit** validation.
+
+### Swagger / Scalar “Failed to fetch”
+
+1. **`OPENAPI_SERVER_URL` must match the browser URL**, including **port**. If nginx is on `http://95.81.98.168:7000`, set `OPENAPI_SERVER_URL=http://95.81.98.168:7000`. If it is only `http://95.81.98.168`, Try it out sends requests to **port 80** — wrong host/port → network error or CORS.
+2. **Firewall** on the server must allow inbound **TCP** on the published ports (e.g. `7000` and `8000`).
+3. **CORS** is enabled by default (`CORS_ALLOW_ORIGINS=*`). If you lock it down, include the exact origin you use to open `/docs` (scheme + host + port).
 
 ## Timeouts, errors & logging
 

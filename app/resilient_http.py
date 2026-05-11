@@ -47,9 +47,16 @@ async def read_response_body_limited(response: httpx.Response, max_bytes: int) -
 
 
 def _materialized_response(original: httpx.Response, body: bytes) -> httpx.Response:
+    # `aiter_bytes()` yields decoded (decompressed) content, but original headers may still
+    # advertise Content-Encoding: gzip. A new Response with that header would try to
+    # decompress again on .json() → zlib "incorrect header check".
+    headers = httpx.Headers(original.headers)
+    for name in ("content-encoding", "content-length", "transfer-encoding"):
+        while name in headers:
+            del headers[name]
     return httpx.Response(
         status_code=original.status_code,
-        headers=original.headers,
+        headers=headers,
         content=body,
         request=original.request,
     )

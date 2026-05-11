@@ -1,3 +1,6 @@
+import gzip
+import json
+
 import httpx
 import pytest
 
@@ -67,6 +70,28 @@ async def test_resilient_get_rejects_content_length_over_limit() -> None:
     async with httpx.AsyncClient(transport=transport) as client:
         with pytest.raises(ResponseBodyTooLarge):
             await resilient_get(client, settings, "https://example.test/x")
+
+
+@pytest.mark.asyncio
+async def test_resilient_get_json_works_after_gzip_response() -> None:
+    """aiter_bytes() decodes gzip; rebuilt Response must not keep Content-Encoding: gzip."""
+    payload = {"hello": "world"}
+    gz = gzip.compress(json.dumps(payload).encode())
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-encoding": "gzip", "content-type": "application/json"},
+            content=gz,
+        )
+
+    transport = httpx.MockTransport(handler)
+    settings = Settings()
+    async with httpx.AsyncClient(transport=transport) as client:
+        r = await resilient_get(client, settings, "https://example.test/x")
+    assert r.status_code == 200
+    assert r.json() == payload
+    assert r.headers.get("content-encoding") is None
 
 
 @pytest.mark.asyncio

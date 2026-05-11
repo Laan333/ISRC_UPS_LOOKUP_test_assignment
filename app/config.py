@@ -54,6 +54,14 @@ class Settings(BaseSettings):
 
     api_rate_limit_per_minute: int = 120
 
+    cors_allow_origins: str = Field(
+        default="*",
+        description=(
+            "Browser CORS for Swagger/Scalar: '*' or comma-separated origins (env: CORS_ALLOW_ORIGINS). "
+            "Empty string disables CORSMiddleware."
+        ),
+    )
+
     log_level: str = Field(
         default="INFO",
         description="Root log level (env: LOG_LEVEL), e.g. DEBUG, INFO, WARNING.",
@@ -85,6 +93,15 @@ class Settings(BaseSettings):
         if isinstance(v, str) and not v.strip():
             return None
         return v
+
+    def cors_origins_for_middleware(self) -> list[str] | None:
+        s = self.cors_allow_origins.strip()
+        if not s:
+            return None
+        if s == "*":
+            return ["*"]
+        parts = [p.strip() for p in s.split(",") if p.strip()]
+        return parts or None
 
 
 @lru_cache

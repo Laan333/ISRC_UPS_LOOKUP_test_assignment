@@ -37,3 +37,9 @@ def test_scalar_reference_page() -> None:
     assert r.status_code == 200
     text = r.text.lower()
     assert "openapi.json" in text or "scalar" in text
+
+
+def test_cors_reflects_wildcard() -> None:
+    r = client.get("/health", headers={"Origin": "http://example.com"})
+    assert r.status_code == 200
+    assert r.headers.get("access-control-allow-origin") == "*"
