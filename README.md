@@ -73,6 +73,7 @@ Create a `.env` next to `docker-compose.yml` (see `.env.example`). The **`api`**
 |----------|---------|
 | `OPENAPI_SERVER_URL` | Public base URL for Swagger / Scalar **Try it out** (scheme + host + port). Examples: `http://localhost`, `https://api.example.com`. |
 | `READY_CHECK_URL` | Optional URL probed by `GET /ready`; use the **same scheme and host** as the public edge (e.g. `https://api.example.com/health`). |
+| `READY_CHECK_FALLBACK_URL` | Optional second URL if the primary check fails (**transport error** or HTTP **≥500**). Docker Compose defaults to **`http://nginx/health`** when unset (single `-` in compose: set `READY_CHECK_FALLBACK_URL=` in `.env` to disable). Use this when the public URL is unreachable from the `api` container (hairpin NAT). |
 | `NGINX_HTTP_PORT` | Host → container `80` (default `80`). Use `8080` if port 80 is busy. |
 | `NGINX_HTTPS_PORT` | Host port mapped to nginx `443` **only when** you use `docker-compose.https.yml` (default `443`). |
 | `NGINX_SSL_ENABLED` | `true` / `false` (default `false`). When `true`, nginx loads TLS PEMs and redirects port **80** → **HTTPS**. |
@@ -143,7 +144,7 @@ Copy `.env.example` to `.env` and adjust. Below are the main **application** set
 |----------|---------|
 | `APP_VERSION` | OpenAPI `info.version` string; default `0.1.0`. |
 | `OPENAPI_SERVER_URL` | Base URL under OpenAPI **`servers`** for Swagger/Scalar **Try it out**. Empty string omits `servers` from the schema. |
-| `READY_CHECK_URL` | Optional: URL probed by `GET /ready`. If unreachable or returns `5xx`, `/ready` responds with **503**. |
+| `READY_CHECK_URL` | Optional: URL probed by `GET /ready`. If unreachable or returns `5xx`, `/ready` tries **`READY_CHECK_FALLBACK_URL`** when set (or Compose default), then **503** if both fail. |
 | `USER_AGENT` | Outgoing `User-Agent` for provider HTTP calls. **Docker:** `docker-compose.yml` sets this in the `api` service `environment:` block, so it **overrides** the same key from `.env` for containers—edit the compose file to change UA under Compose. |
 | `HTTP_TIMEOUT_S` | httpx timeout in seconds; default `15`. |
 | `HTTP_GET_MAX_RETRIES` | Extra GET attempts on timeout/connection issues or `502`/`503`/`504`; default `2`. |
@@ -176,7 +177,7 @@ Copy `.env.example` to `.env` and adjust. Below are the main **application** set
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/health` | Liveness; used by Docker healthcheck. |
-| `GET` | `/ready` | Readiness. If `READY_CHECK_URL` is set, performs an extra HTTP GET to that URL. |
+| `GET` | `/ready` | Readiness. If `READY_CHECK_URL` is set, probes it (then optional `READY_CHECK_FALLBACK_URL` on transport failure or `5xx`). |
 | `GET` | `/lookup/isrc/{code}` | ISRC normalization (case and hyphens ignored); **422** on invalid format. |
 | `GET` | `/lookup/upc/{code}` | Digits length 8 / 12 / 13; **EAN-13 / UPC-A check digit** validation; **422** on failure. |
 
@@ -359,6 +360,7 @@ curl "http://localhost:8000/lookup/isrc/USRC17607839"
 |------------|------------|
 | `OPENAPI_SERVER_URL` | Публичный базовый URL для Swagger / Scalar **Try it out** (схема + хост + порт). |
 | `READY_CHECK_URL` | Опционально: URL для проверки из `GET /ready`; та же схема и хост, что у публичного входа. |
+| `READY_CHECK_FALLBACK_URL` | Второй URL при сбое первичной проверки (**транспорт** или HTTP **≥500**). В `docker-compose.yml` по умолчанию **`http://nginx/health`**, если переменная **не задана**; отключить — строка `READY_CHECK_FALLBACK_URL=` в `.env`. |
 | `NGINX_HTTP_PORT` | Проброс хоста → контейнер `80` (по умолчанию `80`). |
 | `NGINX_HTTPS_PORT` | Проброс на nginx `443` **только** с `docker-compose.https.yml` (по умолчанию `443`). |
 | `NGINX_SSL_ENABLED` | `true` / `false` — TLS в nginx и редирект с **80** на **HTTPS**. |
@@ -429,7 +431,7 @@ python client.py --interactive --pretty
 |------------|------------|
 | `APP_VERSION` | Строка версии в OpenAPI `info.version`; по умолчанию `0.1.0`. |
 | `OPENAPI_SERVER_URL` | Базовый URL в OpenAPI **`servers`** для **Try it out**. Пустая строка убирает `servers` из схемы. |
-| `READY_CHECK_URL` | Опционально: URL для проверки в `GET /ready`; при недоступности или `5xx` — ответ **503**. |
+| `READY_CHECK_URL` | Опционально: URL для проверки в `GET /ready`; при ошибке транспорта или `5xx` пробуется **`READY_CHECK_FALLBACK_URL`** (или значение по умолчанию из Compose), иначе **503**. |
 | `USER_AGENT` | Исходящий `User-Agent` для запросов к провайдерам. **Docker:** в `docker-compose.yml` для сервиса `api` значение задано в `environment:` и **перекрывает** одноимённый ключ из `.env` — меняйте compose, если нужен другой UA в контейнере. |
 | `HTTP_TIMEOUT_S` | Таймаут httpx в секундах; по умолчанию `15`. |
 | `HTTP_GET_MAX_RETRIES` | Дополнительные попытки GET при таймаутах/обрыве или `502`/`503`/`504`; по умолчанию `2`. |
@@ -453,7 +455,7 @@ python client.py --interactive --pretty
 | Метод | Путь | Описание |
 |-------|------|----------|
 | `GET` | `/health` | Liveness; используется Docker healthcheck. |
-| `GET` | `/ready` | Readiness; при заданном `READY_CHECK_URL` — дополнительный HTTP GET. |
+| `GET` | `/ready` | Readiness; при заданном `READY_CHECK_URL` — GET, при необходимости fallback URL. |
 | `GET` | `/lookup/isrc/{code}` | Нормализация ISRC; **422** при неверном формате. |
 | `GET` | `/lookup/upc/{code}` | Длина 8 / 12 / 13 цифр, проверка контрольной цифры; **422** при ошибке. |
 

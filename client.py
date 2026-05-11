@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
 import sys
 from typing import Any
 
@@ -20,7 +21,28 @@ def _join_url(base_url: str, path: str) -> str:
     return f"{base}{p}"
 
 
-def _print_response(r: httpx.Response, *, pretty: bool) -> None:
+def _normalize_api_base(raw: str) -> str:
+    """Strip, add http:// if scheme missing, drop trailing slash (paths use _join_url)."""
+    s = (raw or "").strip()
+    if not s:
+        return s
+    if "://" not in s:
+        s = f"http://{s}"
+    return s.rstrip("/")
+
+
+def _is_openapi_json_url(url: str) -> bool:
+    path = url.split("?")[0].rstrip("/")
+    return path.endswith("/openapi.json") or path.endswith("openapi.json")
+
+
+def _print_response(
+    r: httpx.Response,
+    *,
+    pretty: bool,
+    request_url: str | None = None,
+    max_pretty_json_chars: int = 120_000,
+) -> None:
     print(f"HTTP {r.status_code}")
     ct = (r.headers.get("content-type") or "").lower()
     if "application/json" in ct or r.text.strip().startswith(("{", "[")):
@@ -29,8 +51,18 @@ def _print_response(r: httpx.Response, *, pretty: bool) -> None:
         except Exception:  # noqa: BLE001
             print(r.text)
             return
+        openapi = bool(request_url and _is_openapi_json_url(request_url))
+        sort_keys = not (pretty and openapi)
         if pretty:
-            print(json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True))
+            text = json.dumps(data, ensure_ascii=False, indent=2, sort_keys=sort_keys)
+            if openapi and len(text) > max_pretty_json_chars:
+                print(text[:max_pretty_json_chars])
+                print(
+                    f"\n... [truncated: OpenAPI JSON is {len(text)} characters; "
+                    f"save full schema, e.g.: curl -sS {shlex.quote(request_url)} -o openapi.json]"
+                )
+            else:
+                print(text)
         else:
             print(json.dumps(data, ensure_ascii=False))
     else:
@@ -42,24 +74,31 @@ def _print_response(r: httpx.Response, *, pretty: bool) -> None:
 
 
 def _request_get(
-    client: httpx.Client, url: str, *, pretty: bool
+    client: httpx.Client,
+    url: str,
+    *,
+    pretty: bool,
+    request_timeout: float | None = None,
 ) -> int:
     try:
-        r = client.get(url)
+        r = client.get(url, timeout=request_timeout)
     except httpx.HTTPError as e:
         print(f"Request failed: {e}", file=sys.stderr)
         return 2
-    _print_response(r, pretty=pretty)
+    _print_response(r, pretty=pretty, request_url=url)
     return 0 if r.status_code < 400 else 1
 
 
 def _prompt_base_url(default: str) -> str:
     raw = input(f"API base URL [{default}]: ").strip()
-    return raw or default
+    merged = raw or default
+    return _normalize_api_base(merged)
 
 
 def run_interactive(*, timeout: float, pretty: bool) -> int:
-    default = (os.getenv("BASE_URL") or "http://127.0.0.1:8000").strip()
+    default = _normalize_api_base(
+        (os.getenv("BASE_URL") or "http://127.0.0.1:8000").strip()
+    )
     base = _prompt_base_url(default)
 
     print("\nCommands: test ISRC/UPC lookup, health, readiness, or OpenAPI JSON.")
@@ -115,7 +154,13 @@ def run_interactive(*, timeout: float, pretty: bool) -> int:
             if choice == "5":
                 url = _join_url(base, "/openapi.json")
                 print(f"GET {url}")
-                _request_get(client, url, pretty=pretty)
+                # Schema can be large; allow a longer read than the default client timeout.
+                _request_get(
+                    client,
+                    url,
+                    pretty=pretty,
+                    request_timeout=max(timeout, 120.0),
+                )
                 continue
 
             print("Unknown choice. Try 0–6.")
@@ -142,6 +187,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON output")
 
     args = parser.parse_args(argv)
+    args.base_url = _normalize_api_base(args.base_url)
 
     if args.interactive:
         if args.isrc or args.upc:

@@ -1,9 +1,60 @@
 import httpx
 from fastapi import APIRouter, HTTPException, Request
 
-from app.config import get_settings
+from app.config import Settings, get_settings
 
 router = APIRouter(tags=["service"])
+
+_READY_TIMEOUT = httpx.Timeout(3.0)
+
+
+def _ready_check_failed_http_exc(url: str, suffix: str = "") -> HTTPException:
+    detail = f"Ready check failed: {url}{suffix}"
+    return HTTPException(status_code=503, detail=detail)
+
+
+async def _ready_probe_one(
+    client: httpx.AsyncClient,
+    url: str,
+) -> httpx.Response:
+    return await client.get(url, timeout=_READY_TIMEOUT, follow_redirects=True)
+
+
+async def _ready_probe_chain(
+    client: httpx.AsyncClient,
+    settings: Settings,
+    primary: str,
+) -> None:
+    """Raise HTTPException(503) if neither primary nor optional fallback succeeds."""
+    fallback = (settings.ready_check_fallback_url or "").strip()
+
+    try:
+        r = await _ready_probe_one(client, primary)
+    except httpx.RequestError:
+        if not fallback:
+            raise _ready_check_failed_http_exc(primary) from None
+        try:
+            r = await _ready_probe_one(client, fallback)
+        except httpx.RequestError:
+            raise _ready_check_failed_http_exc(
+                primary, f" (fallback also failed: {fallback})"
+            ) from None
+        if r.status_code >= 500:
+            raise _ready_check_failed_http_exc(fallback, f" ({r.status_code})") from None
+        return
+
+    if r.status_code < 500:
+        return
+    if not fallback:
+        raise _ready_check_failed_http_exc(primary, f" ({r.status_code})") from None
+    try:
+        r2 = await _ready_probe_one(client, fallback)
+    except httpx.RequestError:
+        raise _ready_check_failed_http_exc(
+            primary, f" ({r.status_code}; fallback transport failed: {fallback})"
+        ) from None
+    if r2.status_code >= 500:
+        raise _ready_check_failed_http_exc(fallback, f" ({r2.status_code})") from None
 
 
 @router.get(
@@ -21,7 +72,8 @@ async def health() -> dict[str, str]:
     summary="Readiness",
     description=(
         "Готовность процесса. "
-        "Если задан `READY_CHECK_URL`, выполняется пробный запрос, и при недоступности возвращается 503."
+        "Если задан `READY_CHECK_URL`, выполняется пробный GET; при ошибке транспорта или ответе ≥500 "
+        "опционально пробуется `READY_CHECK_FALLBACK_URL` (например `http://nginx/health` из контейнера `api`)."
     ),
     response_description="Процесс готов принимать трафик.",
 )
@@ -36,14 +88,7 @@ async def ready(request: Request) -> dict[str, str]:
     if client is None:
         client = httpx.AsyncClient(headers={"User-Agent": settings.user_agent})
     try:
-        r = await client.get(url, timeout=httpx.Timeout(3.0), follow_redirects=True)
-        if r.status_code >= 500:
-            raise HTTPException(
-                status_code=503,
-                detail=f"Ready check failed: {url} ({r.status_code})",
-            )
-    except httpx.HTTPError:
-        raise HTTPException(status_code=503, detail=f"Ready check failed: {url}") from None
+        await _ready_probe_chain(client, settings, url)
     finally:
         if own_client:
             await client.aclose()

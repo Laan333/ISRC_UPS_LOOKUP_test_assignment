@@ -28,6 +28,15 @@ class Settings(BaseSettings):
             "If set, /ready returns 503 when the URL is unreachable."
         ),
     )
+    ready_check_fallback_url: str | None = Field(
+        default=None,
+        description=(
+            "Optional second URL for /ready (env: READY_CHECK_FALLBACK_URL). "
+            "If READY_CHECK_URL fails with a transport error (timeout, connection refused, etc.), "
+            "this URL is tried once — e.g. http://nginx/health from the api container when the public "
+            "edge URL is not reachable due to Docker/hairpin routing."
+        ),
+    )
     user_agent: str = "ISRC_UPS_Lookup/1.0 (educational)"
     http_timeout_s: float = 15.0
     http_get_max_retries: int = 2
