@@ -17,7 +17,7 @@ class DeezerProvider:
 
     Supports:
     - ISRC: q=isrc:"<code>"
-    - UPC/EAN: q=upc:"<code>" (coverage depends on Deezer catalog)
+    - UPC/EAN: ``q=upc:"<code>"``; for 13-digit EAN with a leading ``0``, also tries the 12-digit UPC-A form.
     """
 
     id = "deezer"
@@ -33,7 +33,15 @@ class DeezerProvider:
         return await self._search(f'isrc:"{code}"')
 
     async def lookup_upc(self, code: str) -> ProviderEntry:
-        return await self._search(f'upc:"{code}"')
+        queries = [f'upc:"{code}"']
+        if len(code) == 13 and code.startswith("0"):
+            queries.append(f'upc:"{code[1:]}"')
+        last: ProviderEntry | None = None
+        for q in queries:
+            last = await self._search(q)
+            if last.found:
+                return last
+        return last or await self._search(queries[0])
 
     async def lookup_free_text(self, query: str) -> ProviderEntry:
         """Plain Deezer search ``q=…`` (track-oriented results; used as a fallback when ISRC/UPC miss)."""

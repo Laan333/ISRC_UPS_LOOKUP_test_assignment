@@ -10,7 +10,7 @@ from app.cache import TtlCache
 from app.config import Settings
 from app.normalize import collapse_ws
 from app.providers.base import MetadataProvider
-from app.schemas.lookup import LookupResponse, ProviderEntry
+from app.schemas.lookup import LookupResponse, ProviderEntry, SummaryBlock
 from app.summary import build_summary
 
 logger = logging.getLogger(__name__)
@@ -66,8 +66,9 @@ class LookupService:
 
         providers = await self._gather(tasks, request_id, code)
         providers = await self._refine_by_title_hint(providers, request_id=request_id, code=code)
+        before_omit = providers
         providers = self._omit_providers_with_only_error(providers)
-        summary = build_summary(providers)
+        summary = self._summary_with_dropped_errors(before_omit, build_summary(providers))
         out = LookupResponse(query=code, providers=providers, summary=summary)
         if self._cache is not None:
             await self._cache.set(cache_key, out)
@@ -111,12 +112,31 @@ class LookupService:
 
         providers = await self._gather(tasks, request_id, code)
         providers = await self._refine_by_title_hint(providers, request_id=request_id, code=code)
+        before_omit = providers
         providers = self._omit_providers_with_only_error(providers)
-        summary = build_summary(providers)
+        summary = self._summary_with_dropped_errors(before_omit, build_summary(providers))
         out = LookupResponse(query=code, providers=providers, summary=summary)
         if self._cache is not None:
             await self._cache.set(cache_key, out)
         return out
+
+    @staticmethod
+    def _summary_with_dropped_errors(
+        before_omit: list[ProviderEntry], summary: SummaryBlock
+    ) -> SummaryBlock:
+        """If nothing matched, mention providers that failed and were removed from the list."""
+        if summary.found_in > 0:
+            return summary
+        errs = [f"{p.provider}: {p.error}" for p in before_omit if not p.found and p.error]
+        if not errs:
+            return summary
+        clip = " | ".join(errs[:4])
+        if len(errs) > 4:
+            clip += " | …"
+        note = f"Some sources failed ({clip})."
+        if summary.note:
+            return summary.model_copy(update={"note": f"{summary.note} {note}"})
+        return summary.model_copy(update={"note": note})
 
     @staticmethod
     def _omit_providers_with_only_error(providers: list[ProviderEntry]) -> list[ProviderEntry]:

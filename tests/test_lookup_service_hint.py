@@ -6,7 +6,7 @@ import httpx
 import pytest
 
 from app.config import Settings
-from app.schemas.lookup import ProviderEntry
+from app.schemas.lookup import ProviderEntry, SummaryBlock
 from app.services.lookup_service import LookupService
 
 
@@ -95,6 +95,25 @@ async def test_isrc_omits_wikidata_on_error_and_refines_deezer_discogs() -> None
     assert deezer.hint_query == "Hint Artist Hint Title"
     assert discogs.hint_query == "Hint Artist Hint Title"
     assert by["discogs"].found is True
+
+
+def test_summary_note_when_upstream_errors_omitted() -> None:
+    before = [
+        ProviderEntry(
+            provider="musicbrainz",
+            found=False,
+            error="HTTP error: Server error '502 Bad Gateway'",
+            raw=None,
+        ),
+        ProviderEntry(provider="deezer", found=False, raw={"total": 0}),
+    ]
+    summary = LookupService._summary_with_dropped_errors(
+        before,
+        SummaryBlock(found_in=0, confidence="low", note=None),
+    )
+    assert summary.note
+    assert "musicbrainz" in summary.note.lower()
+    assert "502" in summary.note
 
 
 @pytest.mark.asyncio

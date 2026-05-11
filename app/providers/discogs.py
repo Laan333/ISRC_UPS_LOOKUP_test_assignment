@@ -17,7 +17,8 @@ class DiscogsProvider:
 
     - **ISRC:** ``GET /database/search?q=<isrc>&type=release`` (heuristic; catalog varies).
     - **UPC/EAN:** ``GET /database/search?barcode=<code>&type=release``; if empty, fallback
-      ``q=<code>&type=release``. On a hit, optional ``GET /releases/{id}`` enriches label/year/country.
+      ``q=<code>&type=release``. For 13-digit EAN with a leading ``0``, repeats both with the
+      12-digit UPC-A form. On a hit, optional ``GET /releases/{id}`` enriches label/year/country.
     """
 
     id = "discogs"
@@ -63,20 +64,27 @@ class DiscogsProvider:
 
     async def lookup_upc(self, code: str) -> ProviderEntry:
         url = f"{self._settings.discogs_api_base_url}/database/search"
-        entry = await self._search(
-            url,
-            {"barcode": code, "type": "release", "per_page": 10},
-            is_barcode_query=True,
-        )
-        if not entry.found:
+        variants = [code]
+        if len(code) == 13 and code.startswith("0"):
+            variants.append(code[1:])
+
+        entry = ProviderEntry(provider=self.id, found=False, raw=None)
+        for cand in variants:
             entry = await self._search(
                 url,
-                {"q": code, "type": "release", "per_page": 10},
+                {"barcode": cand, "type": "release", "per_page": 10},
                 is_barcode_query=True,
             )
-        if not entry.found:
-            return entry
-        return await self._attach_release_detail(entry)
+            if entry.found:
+                return await self._attach_release_detail(entry)
+            entry = await self._search(
+                url,
+                {"q": cand, "type": "release", "per_page": 10},
+                is_barcode_query=True,
+            )
+            if entry.found:
+                return await self._attach_release_detail(entry)
+        return entry
 
     async def _attach_release_detail(self, entry: ProviderEntry) -> ProviderEntry:
         rid = entry.raw.get("id") if entry.raw else None
