@@ -51,7 +51,7 @@ Create a `.env` next to `docker-compose.yml` (see `.env.example`). Match **`OPEN
 | `NGINX_SSL_CERT` | Path **inside the container** to the certificate chain (default `/etc/nginx/ssl/fullchain.pem`). |
 | `NGINX_SSL_KEY` | Path **inside the container** to the private key (default `/etc/nginx/ssl/privkey.pem`). |
 
-Nginx behaviour is generated at container start from `nginx/build/http-only.conf` or `nginx/build/https.conf.envsubst` (see `nginx/docker-entrypoint.d/99-gen-nginx-conf.sh`). To pin a hostname, edit `server_name _;` in those files to e.g. `server_name api.example.com;` and rebuild the nginx image.
+Nginx behaviour is generated at container start from `nginx/http-only.conf` or `nginx/https.conf.envsubst` (see `nginx/docker-entrypoint.d/99-gen-nginx-conf.sh`). To pin a hostname, edit `server_name _;` in those files to e.g. `server_name api.example.com;` and rebuild the nginx image.
 
 **Interactive docs (after startup):**  
 Use the same scheme/host/port as in `OPENAPI_SERVER_URL` (e.g. `https://localhost/docs` when HTTPS is enabled, or `http://localhost/docs` on HTTP only). Direct uvicorn: [Swagger UI](http://localhost:8000/docs), etc.
@@ -157,7 +157,7 @@ The easiest path is a `.env` file: copy `.env.example` to `.env` and adjust valu
 | **Retries** (`HTTP_GET_MAX_RETRIES`) | Extra attempts on timeouts / `502–504` | `2` → up to **3** attempts per GET |
 | **Wall time per provider** | Rough upper bound | \(\approx (\text{HTTP\_GET\_MAX\_RETRIES}+1) \times \text{HTTP\_TIMEOUT\_S}\) + backoff (order of **45–60 s** with defaults) |
 | **Lookup request** | Providers run **in parallel** | Total wait ≈ **slowest** provider, not the sum |
-| **nginx `proxy_read_timeout`** | Max wait for a response from uvicorn after the request is forwarded | **90 s** in `nginx/build/http-only.conf` / generated HTTPS config — must stay **≥** the realistic worst lookup; raise it if you increase `HTTP_TIMEOUT_S` or retries |
+| **nginx `proxy_read_timeout`** | Max wait for a response from uvicorn after the request is forwarded | **90 s** in `nginx/http-only.conf` / generated HTTPS config — must stay **≥** the realistic worst lookup; raise it if you increase `HTTP_TIMEOUT_S` or retries |
 | **nginx `proxy_connect_timeout`** | TCP connect to `api:8000` | **10 s** |
 | **nginx `proxy_send_timeout`** | Sending the request body to uvicorn | **90 s** (large bodies are unlikely here) |
 
@@ -177,7 +177,7 @@ Every response should include header **`X-Request-ID`** (from middleware).
 ### HTTP errors (nginx)
 
 - **`proxy_intercept_errors` is off** so JSON error bodies from FastAPI are **not** rewritten by nginx.
-- If the **upstream is unreachable** or nginx hits a **proxy read timeout**, nginx returns small **JSON** payloads (`source: "nginx"`) for **502** / **504** (see `error_page` in `nginx/build/http-only.conf` and `nginx/build/https.conf.envsubst`).
+- If the **upstream is unreachable** or nginx hits a **proxy read timeout**, nginx returns small **JSON** payloads (`source: "nginx"`) for **502** / **504** (see `error_page` in `nginx/http-only.conf` and `nginx/https.conf.envsubst`).
 
 ## Architecture / technical notes
 
