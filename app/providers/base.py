@@ -11,7 +11,7 @@ class MetadataProvider(Protocol):
     async def lookup_upc(self, code: str) -> ProviderEntry: ...
 
 
-def safe_raw_fragment(data: Any, max_chars: int = 4000) -> dict[str, Any]:
+def safe_raw_fragment(data: Any, max_chars: int = 12000) -> dict[str, Any]:
     if isinstance(data, dict):
         out: dict[str, Any] = dict(data)
     else:

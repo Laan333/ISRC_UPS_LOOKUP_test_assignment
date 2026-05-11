@@ -21,7 +21,7 @@ def _mb_transport_isrc_with_detail(*, detail_fixture: str) -> httpx.MockTranspor
             return httpx.Response(200, json=detail)
         if "/ws/2/recording" in u and "query=" in u and "isrc" in u.lower():
             return httpx.Response(200, json=search)
-        if "/ws/2/release/" in u and "query=" not in u and "inc=labels" in u:
+        if "/ws/2/release/" in u and "query=" not in u:
             if "rel-pick-1" in u:
                 return httpx.Response(200, json=labels_enriched)
             if "test-rel-id" in u:
@@ -60,6 +60,8 @@ async def test_musicbrainz_isrc_enriched_album_and_label(no_musicbrainz_throttle
     assert r.album == "Example Album RG"
     assert r.label == "Indie Label Co"
     assert r.raw and r.raw.get("primary_release", {}).get("id") == "rel-pick-1"
+    detail = r.raw.get("primary_release_detail") or {}
+    assert detail.get("tracklist") and detail["tracklist"][0].get("title") == "Example Track"
 
 
 @pytest.mark.asyncio
@@ -74,6 +76,8 @@ async def test_musicbrainz_upc_parses_release(no_musicbrainz_throttle: None) -> 
     assert r.artist == "Band Name"
     assert r.label == "Fixture Records"
     assert r.raw and r.raw.get("barcode") == "5901234123457"
+    mb_rel = r.raw.get("musicbrainz_release") or {}
+    assert mb_rel.get("tracklist") and mb_rel["tracklist"][0].get("title") == "Opening"
 
 
 @pytest.mark.asyncio

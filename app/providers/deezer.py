@@ -30,7 +30,8 @@ class DeezerProvider:
         return {"User-Agent": self._settings.user_agent, "Accept": "application/json"}
 
     async def lookup_isrc(self, code: str) -> ProviderEntry:
-        return await self._search(f'isrc:"{code}"')
+        entry = await self._search(f'isrc:"{code}"')
+        return await self._attach_track_detail(entry)
 
     async def lookup_upc(self, code: str) -> ProviderEntry:
         queries = [f'upc:"{code}"']
@@ -40,8 +41,118 @@ class DeezerProvider:
         for q in queries:
             last = await self._search(q)
             if last.found:
-                return last
-        return last or await self._search(queries[0])
+                return await self._attach_album_detail(last)
+        fallback = last or await self._search(queries[0])
+        return await self._attach_album_detail(fallback)
+
+    async def _get_entity(self, path: str) -> dict[str, Any] | None:
+        base = self._settings.deezer_api_base_url.rstrip("/")
+        url = f"{base}/{path.lstrip('/')}"
+        try:
+            r = await resilient_get(self._client, self._settings, url, headers=self._headers())
+            r.raise_for_status()
+            data = r.json()
+        except httpx.HTTPError:
+            return None
+        except Exception:  # noqa: BLE001
+            return None
+        if not isinstance(data, dict):
+            return None
+        if data.get("error"):
+            return None
+        return data
+
+    async def _attach_track_detail(self, entry: ProviderEntry) -> ProviderEntry:
+        if not entry.found or not entry.raw:
+            return entry
+        tid = entry.raw.get("id")
+        if not isinstance(tid, int):
+            return entry
+        detail = await self._get_entity(f"track/{tid}")
+        if not detail:
+            return entry
+        merged = dict(entry.raw)
+        merged["track_detail"] = self._compact_track_detail(detail)
+        return ProviderEntry(
+            provider=self.id,
+            found=entry.found,
+            title=entry.title,
+            artist=entry.artist,
+            album=entry.album,
+            label=entry.label,
+            error=entry.error,
+            raw=safe_raw_fragment(merged),
+        )
+
+    async def _attach_album_detail(self, entry: ProviderEntry) -> ProviderEntry:
+        if not entry.found or not entry.raw:
+            return entry
+        alb = entry.raw.get("album")
+        aid = None
+        if isinstance(alb, dict):
+            aid = alb.get("id")
+        if not isinstance(aid, int):
+            return entry
+        detail = await self._get_entity(f"album/{aid}")
+        if not detail:
+            return entry
+        merged = dict(entry.raw)
+        merged["album_detail"] = self._compact_album_detail(detail)
+        return ProviderEntry(
+            provider=self.id,
+            found=entry.found,
+            title=entry.title,
+            artist=entry.artist,
+            album=entry.album,
+            label=collapse_ws(str(detail.get("label") or "")) or entry.label,
+            error=entry.error,
+            raw=safe_raw_fragment(merged),
+        )
+
+    @staticmethod
+    def _compact_track_detail(d: dict[str, Any]) -> dict[str, Any]:
+        alb = d.get("album") if isinstance(d.get("album"), dict) else {}
+        row: dict[str, Any] = {
+            "isrc": d.get("isrc"),
+            "bpm": d.get("bpm"),
+            "gain": d.get("gain"),
+            "track_position": d.get("track_position"),
+            "disk_number": d.get("disk_number"),
+            "release_date": d.get("release_date") or alb.get("release_date"),
+            "explicit_content_lyrics": d.get("explicit_content_lyrics"),
+            "readable": d.get("readable"),
+        }
+        contribs = d.get("contributors")
+        if isinstance(contribs, list) and contribs:
+            names: list[str] = []
+            for c in contribs[:12]:
+                if isinstance(c, dict) and c.get("name"):
+                    names.append(str(c["name"]))
+            if names:
+                row["contributors"] = names
+        return {k: v for k, v in row.items() if v not in (None, [])}
+
+    @staticmethod
+    def _compact_album_detail(d: dict[str, Any]) -> dict[str, Any]:
+        genres_block = d.get("genres") or {}
+        glist = genres_block.get("data") if isinstance(genres_block, dict) else []
+        genre_names: list[str] = []
+        if isinstance(glist, list):
+            for g in glist[:8]:
+                if isinstance(g, dict) and g.get("name"):
+                    genre_names.append(str(g["name"]))
+        row: dict[str, Any] = {
+            "title": d.get("title"),
+            "upc": d.get("upc"),
+            "label": d.get("label"),
+            "nb_tracks": d.get("nb_tracks"),
+            "duration": d.get("duration"),
+            "release_date": d.get("release_date"),
+            "record_type": d.get("record_type"),
+            "explicit_lyrics": d.get("explicit_lyrics"),
+            "genres": genre_names or None,
+        }
+        return {k: v for k, v in row.items() if v not in (None, [])}
 
     async def lookup_free_text(self, query: str) -> ProviderEntry:
         """Plain Deezer search ``q=…`` (track-oriented results; used as a fallback when ISRC/UPC miss)."""

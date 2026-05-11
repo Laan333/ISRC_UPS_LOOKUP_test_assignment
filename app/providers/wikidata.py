@@ -31,12 +31,13 @@ class WikidataIsrcProvider:
             )
 
         query = f"""
-SELECT ?work ?workLabel ?performerLabel WHERE {{
+SELECT ?work ?workLabel ?performerLabel ?pubDate WHERE {{
   ?work wdt:P1243 "{code}" .
   OPTIONAL {{ ?work wdt:P175 ?performer . }}
+  OPTIONAL {{ ?work wdt:P577 ?pubDate . }}
   SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
 }}
-LIMIT 5
+LIMIT 8
 """.strip()
 
         url = f"{self._settings.wikidata_sparql_url}?{urlencode({'query': query, 'format': 'json'})}"
@@ -76,13 +77,28 @@ LIMIT 5
         artist = self._binding_value(b0.get("performerLabel"))
         title = collapse_ws(title) if title else None
         artist = collapse_ws(artist) if artist else None
+        pub = self._binding_value(b0.get("pubDate"))
+        raw_blob: dict[str, Any] = {"entity": self._binding_value(b0.get("work"))}
+        if pub:
+            raw_blob["publication_date"] = pub
+        all_rows = []
+        for b in bindings[:8]:
+            all_rows.append(
+                {
+                    "entity": self._binding_value(b.get("work")),
+                    "title": self._binding_value(b.get("workLabel")),
+                    "performer": self._binding_value(b.get("performerLabel")),
+                    "publication_date": self._binding_value(b.get("pubDate")),
+                }
+            )
+        raw_blob["bindings_sample"] = all_rows
 
         return ProviderEntry(
             provider=self.id,
             found=True,
             title=title,
             artist=artist,
-            raw=safe_raw_fragment({"entity": self._binding_value(b0.get("work"))}),
+            raw=safe_raw_fragment(raw_blob),
         )
 
     async def lookup_upc(self, code: str) -> ProviderEntry:

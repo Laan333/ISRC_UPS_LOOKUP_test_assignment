@@ -105,5 +105,11 @@ class OpenLibraryProvider:
             "isbn",
             "publisher",
             "key",
+            "subject",
+            "language",
+            "publish_date",
+            "number_of_pages_median",
+            "cover_i",
+            "cover_edition_key",
         )
         return {k: doc[k] for k in keys if k in doc}

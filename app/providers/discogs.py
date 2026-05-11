@@ -233,19 +233,52 @@ class DiscogsProvider:
             "year": d.get("year"),
             "country": d.get("country"),
         }
+        dq = d.get("data_quality")
+        if dq is not None:
+            out["data_quality"] = dq
+        notes = d.get("notes")
+        if isinstance(notes, str) and notes.strip():
+            out["notes_preview"] = notes.strip()[:1200]
+        gs = d.get("genres")
+        if isinstance(gs, list) and gs:
+            out["genres"] = [str(x) for x in gs[:12]]
+        st = d.get("styles")
+        if isinstance(st, list) and st:
+            out["styles"] = [str(x) for x in st[:12]]
+        ids = d.get("identifiers") or []
+        if isinstance(ids, list) and ids:
+            out["identifiers"] = [
+                {"type": x.get("type"), "value": x.get("value")}
+                for x in ids[:15]
+                if isinstance(x, dict)
+            ]
         labels = d.get("labels") or []
         if isinstance(labels, list) and labels and isinstance(labels[0], dict):
             out["labels"] = [
-                {"name": x.get("name"), "catno": x.get("catno")} for x in labels[:3] if isinstance(x, dict)
+                {"name": x.get("name"), "catno": x.get("catno")} for x in labels[:8] if isinstance(x, dict)
             ]
         artists = d.get("artists") or []
         if isinstance(artists, list) and artists:
             out["artists"] = [
-                {"name": x.get("name")} for x in artists[:5] if isinstance(x, dict) and x.get("name")
+                {"name": x.get("name")} for x in artists[:8] if isinstance(x, dict) and x.get("name")
             ]
         fmts = d.get("formats") or []
         if isinstance(fmts, list) and fmts and isinstance(fmts[0], dict):
             out["formats"] = [
-                {"name": x.get("name"), "qty": x.get("qty")} for x in fmts[:5] if isinstance(x, dict)
+                {"name": x.get("name"), "qty": x.get("qty")} for x in fmts[:8] if isinstance(x, dict)
             ]
+        tl = d.get("tracklist") or []
+        if isinstance(tl, list) and tl:
+            tracks: list[dict[str, Any]] = []
+            for t in tl[:50]:
+                if not isinstance(t, dict):
+                    continue
+                tracks.append(
+                    {
+                        "position": t.get("position"),
+                        "title": t.get("title"),
+                        "duration": t.get("duration"),
+                    }
+                )
+            out["tracklist"] = [{k: v for k, v in x.items() if v is not None} for x in tracks]
         return {k: v for k, v in out.items() if v is not None}

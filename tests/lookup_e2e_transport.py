@@ -65,7 +65,7 @@ def build_lookup_e2e_transport() -> httpx.MockTransport:
             return httpx.Response(200, json=mb_recording_detail)
         if "musicbrainz.org" in u and "/recording" in u and "query=" in u and "isrc" in u.lower():
             return httpx.Response(200, json=mb_recording)
-        if "musicbrainz.org" in u and "/ws/2/release/" in u and "inc=labels" in u:
+        if "musicbrainz.org" in u and "/ws/2/release/" in u and "query=" not in u:
             return httpx.Response(200, json=mb_release_labels)
         if "musicbrainz.org" in u and "/release" in u and "barcode" in u.lower():
             return httpx.Response(200, json=mb_release)
@@ -81,6 +81,31 @@ def build_lookup_e2e_transport() -> httpx.MockTransport:
             return httpx.Response(200, json=open_library)
         if "api.deezer.com" in u and "/search" in u:
             return httpx.Response(200, json=deezer_search)
+        if "api.deezer.com" in u and "/track/" in u:
+            return httpx.Response(
+                200,
+                json={
+                    "id": 123,
+                    "title": "Deezer Track",
+                    "duration": 200,
+                    "isrc": "USRC17607839",
+                    "bpm": 120,
+                    "album": {"id": 20, "title": "Deezer Album"},
+                },
+            )
+        if "api.deezer.com" in u and "/album/" in u:
+            return httpx.Response(
+                200,
+                json={
+                    "id": 20,
+                    "title": "Deezer Album",
+                    "upc": "5901234123457",
+                    "label": "Deezer Label",
+                    "nb_tracks": 12,
+                    "release_date": "2020-01-01",
+                    "genres": {"data": [{"name": "Pop"}]},
+                },
+            )
         return httpx.Response(404, text=f"unmocked: {u}")
 
     return httpx.MockTransport(handler)
