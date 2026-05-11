@@ -25,6 +25,10 @@ services:
       - "8000:8000"
     volumes:
       - ./logs:/app/logs
+    # Pass through the project .env so provider toggles and API keys (e.g. Spotify) reach the app.
+    # Pydantic does not read a baked-in .env inside the image; without this, only keys listed below are set.
+    env_file:
+      - .env
     environment:
       USER_AGENT: "ISRC_UPS_Lookup/1.0 (docker)"
       # Values are read from a project ".env" file next to this compose file (Compose interpolation).

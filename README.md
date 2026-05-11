@@ -44,7 +44,7 @@ curl "http://localhost:8000/lookup/isrc/USRC17607839"
 
 ### Domain, HTTP vs HTTPS, OpenAPI “Try it out”, and `.env`
 
-Create a `.env` next to `docker-compose.yml` (see `.env.example`). Match **`OPENAPI_SERVER_URL`** (and optional **`READY_CHECK_URL`**) to what users type in the browser: **`http://…`** for plain HTTP, **`https://…`** when TLS is terminated at nginx. If nginx listens on a **non-default host port** (e.g. `NGINX_HTTP_PORT=7000`), include that port in the URL: `http://YOUR_IP:7000` and `http://YOUR_IP:7000/health` for `READY_CHECK_URL`.
+Create a `.env` next to `docker-compose.yml` (see `.env.example`). The **`api`** service loads that file as `env_file`, so provider toggles and secrets (e.g. **`PROVIDER_SPOTIFY_ENABLED`** / **`SPOTIFY_*`**) are visible inside the container; the explicit `environment:` block only overrides a few keys (logging, CORS, etc.). Match **`OPENAPI_SERVER_URL`** (and optional **`READY_CHECK_URL`**) to what users type in the browser: **`http://…`** for plain HTTP, **`https://…`** when TLS is terminated at nginx. If nginx listens on a **non-default host port** (e.g. `NGINX_HTTP_PORT=7000`), include that port in the URL: `http://YOUR_IP:7000` and `http://YOUR_IP:7000/health` for `READY_CHECK_URL`.
 
 | Variable | Purpose |
 |----------|---------|
