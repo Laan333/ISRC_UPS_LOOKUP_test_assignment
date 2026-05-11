@@ -32,7 +32,7 @@ def test_upc_invalid_check() -> None:
 
 
 def test_upc_gtin14_to_ean13_imagine_dragons_evolve() -> None:
-    """Groover / Spotify-style 14-digit GTIN with valid EAN-13 tail."""
+    """14-digit GTIN-14 with valid EAN-13 tail after stripping the first digit."""
     assert validate_upc("00602567491248") == "0602567491248"
 
 

@@ -31,7 +31,7 @@ def _ean13_check_digit(first_12: str) -> int:
 
 def validate_upc(code: str) -> str:
     digits = normalize_upc(code)
-    # GTIN-14 (e.g. from Spotify / Groover): leading packaging indicator + EAN-13.
+    # GTIN-14: leading packaging indicator + EAN-13 when the tail validates as EAN-13.
     if len(digits) == 14:
         tail = digits[1:]
         if int(tail[12]) == _ean13_check_digit(tail[:12]):
